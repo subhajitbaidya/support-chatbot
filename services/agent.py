@@ -11,7 +11,7 @@ load_dotenv(dotenv_path=".env", override=True)
 class CustomerSupportAgent:
     def __init__(self):
         self.model = ChatOllama(
-            model="llama3.2:latest",
+            model="gpt-oss:120b-cloud",
             temperature=0.5,
             streaming=True
         )
