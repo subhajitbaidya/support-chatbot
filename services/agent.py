@@ -1,67 +1,46 @@
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_ollama.chat_models import ChatOllama
-from langchain.tools import tool
 from langsmith import traceable
+from langchain.agents import create_agent
 from dotenv import load_dotenv
-from utils.cleantext import clean_text
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.vectorstores import InMemoryVectorStore
+from tools.tools import retrieve_context
 
 
 load_dotenv(dotenv_path=".env", override=True)
 
 
 class CustomerSupportAgent:
-    def __init__(self, task):
+    def __init__(self):
         self.model = ChatOllama(
             model="llama3.2:latest",
             temperature=0.5,
             streaming=True
         )
-        self.task = task
-
-    def model(self):
-        pass
-
-    @traceable(name="embedding_model")
-    def __embedding_model(self):
-        return HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-mpnet-base-v2")
-
-    @traceable(name="load_documents")
-    def __directoryloader(self):
-        loader = PyPDFDirectoryLoader('./data/pdf')
-        docs = loader.load()
-        cleaned_docs = [
-            Document(
-                page_content=clean_text(doc.page_content),
-                metadata=doc.metadata
-            )
-            for doc in docs
-        ]
-
-        return cleaned_docs
-
-    def __textsplitter(self):
-        docs = self.__directoryloader()
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=200,
-            chunk_overlap=50,
-            add_start_index=True,
+        self.prompt = (
+            "You are a customer support agent for a laptop manufacturing company and you specialize in providing troubleshooting steps."
+            "Use the tool to help answer user queries."
         )
 
-        all_splits = splitter.split_documents(docs)
-        return all_splits
+    @traceable(run_type='chain')
+    def run_agent(self, query: str):
+        tools = [retrieve_context]
+        agent = create_agent(self.model, tools, system_prompt=self.prompt)
 
-    def vectorstore(self):
-        vector_store = InMemoryVectorStore(self.__embedding_model())
-        docs = self.__textsplitter()
-        doc_id = vector_store.add_documents(documents=docs)
-        return doc_id
+        response = None
+
+        for event in agent.stream(
+            {"messages": [{"role": "user", "content": query}]},
+            stream_mode="values",
+        ):
+            response = event["messages"][-1]
+            response.pretty_print()
+
+        return response
 
 
 if __name__ == "__main__":
-    agent = CustomerSupportAgent("customer support")
-    print(len(agent.textsplitter()))
+    agent = CustomerSupportAgent()
+    query = (
+        "How to fix no power issue?"
+        "Once you get the answer, look up common extensions of that method."
+    )
+    agent.run_agent(query)
