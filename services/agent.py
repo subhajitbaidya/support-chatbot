@@ -18,6 +18,7 @@ class CustomerSupportAgent:
         )
         self.prompt = (
             "You are a customer support agent for a laptop company and you specialize in providing troubleshooting steps."
+            "Once you reach to the first output summarize it and make it shorter"
             "Use the tool to help answer user queries."
         )
 
